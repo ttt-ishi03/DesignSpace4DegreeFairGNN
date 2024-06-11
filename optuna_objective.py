@@ -207,29 +207,29 @@ class Objective:
         model = create_model(args, self.data)
         controller = create_controller(model, args)
 
-        # try:
-        controller.train(
-            data = self.data,
-            n_epoch = [
-                args.link_prediction_n_epoch,
-                args.classification_n_epoch,
-                args.low_degree_finetune_n_epoch,
-            ],
-            early_stopping_patience = 100,
-        )
+        try:
+            controller.train(
+                data = self.data,
+                n_epoch = [
+                    args.link_prediction_n_epoch,
+                    args.classification_n_epoch,
+                    args.low_degree_finetune_n_epoch,
+                ],
+                early_stopping_patience = 100,
+            )
 
-        acc, macf, _, out1, _, _, _, _, _, _, _ = controller.validate(self.data)
-        # except Exception as e:
-        #     print(e)
-        #     self.exception_cnt += 1
-        #     acc = 0
-        #     macf = 0
-        #     out1 = {
-        #         'mu_sp': 0, 'mu_eo': 0,
-        #         'head_acc': 0, 'tail_acc': 0,
-        #         'head_macf': 0, 'tail_macf': 0,
-        #         'diff_acc': 0, 'diff_macf': 0, 'diff_weif': 0,
-        #     }
+            acc, macf, _, out1, _, _, _, _, _, _, _ = controller.validate(self.data)
+        except Exception as e:
+            print(e)
+            self.exception_cnt += 1
+            acc = 0
+            macf = 0
+            out1 = {
+                'mu_sp': 0, 'mu_eo': 0,
+                'head_acc': 0, 'tail_acc': 0,
+                'head_macf': 0, 'tail_macf': 0,
+                'diff_acc': 0, 'diff_macf': 0, 'diff_weif': 0,
+            }
         results = {
             'acc': float(acc), 'macf': macf, 'sp': out1['mu_sp'], 'eo': out1['mu_eo'],
             'head_acc': out1['head_acc'], 'tail_acc': out1['tail_acc'],

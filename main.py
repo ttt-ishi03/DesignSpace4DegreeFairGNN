@@ -261,22 +261,23 @@ def main():
         # h_acc_2 = list()
         # t_acc_2 = list()
 
-        print(f'loading hyper-params from {output_file_whole_args}')
-        with open(output_file_whole_args, 'r') as f:
-            hyper_params = json.load(f)
+        if args.optuna:
+            print(f'loading hyper-params from {output_file_whole_args}')
+            with open(output_file_whole_args, 'r') as f:
+                hyper_params = json.load(f)
 
-        params_key = 'best_score_params'
-        if  not args.delete_results:
-            with open(os.path.join(experiment_seed_root, f'{modelname}_current_params_minimal.json'), 'w') as f:
-                json.dump(hyper_params[params_key], f, indent=4)
-        print(f'hyper-params: {hyper_params[params_key]}')
-        args_dict = vars(args)
-        for k, v in hyper_params[params_key].items():
-            args_dict[k] = v
-        args = argparse.Namespace(**args_dict)
-        if not args.delete_results:
-            with open(os.path.join(experiment_seed_root, f'{modelname}_current_params.json'), 'w') as f:
-                json.dump(args_dict, f, indent=4)
+            params_key = 'best_score_params'
+            if  not args.delete_results:
+                with open(os.path.join(experiment_seed_root, f'{modelname}_current_params_minimal.json'), 'w') as f:
+                    json.dump(hyper_params[params_key], f, indent=4)
+            print(f'hyper-params: {hyper_params[params_key]}')
+            args_dict = vars(args)
+            for k, v in hyper_params[params_key].items():
+                args_dict[k] = v
+            args = argparse.Namespace(**args_dict)
+            if not args.delete_results:
+                with open(os.path.join(experiment_seed_root, f'{modelname}_current_params.json'), 'w') as f:
+                    json.dump(args_dict, f, indent=4)
 
         model_dic = create_model(args, data)
         controller = create_controller(model_dic, args)
