@@ -4,7 +4,7 @@ import numpy as np
 import datasets
 import scipy.sparse as sp
 import torch
-from torch_geometric.nn.models import GCN, GAT, GraphSAGE
+from torch_geometric.nn.models import GCN
 from torch_geometric.nn import summary
 from models import DFair_GCN, DFair_GAT, DFair_Sage #DFairGNN_2
 from models import AllGNN, LinkPredictor
@@ -45,7 +45,7 @@ def convert_data(data, model_type, model_base, ratio=20):
     elif model_type in ['GCN', 'GAT', 'GraphSAGE']:
         data.adj = data.adj.to_sparse_csr()
         data.adj_ = data.adj_.to_sparse_csr()
-    elif model_type in ["MLP", "AllGCN", "AllGAT", "AllSAGE", "AllDegFairGNN"]:
+    elif model_type in ["MLP", "AllGCN", "AllGAT", "AllSAGE", "DegreeFairGNN"]:
         pass
     else:
         print('model invalid', file=sys.stderr)
@@ -64,19 +64,17 @@ def create_model(args, data):
 
     model_dic = {}
 
-    if args.model == "DegFairGNN":
-        if args.base == 1:
-            model_dic['main'] = DFair_GCN(args, in_feat, in_class, data.max_degree)
-        elif args.base == 2:
-            model_dic['main'] = DFair_GAT(args, in_feat, in_class, data.max_degree)
-        elif args.base == 3:
-            model_dic['main'] = DFair_Sage(args, in_feat, in_class, data.max_degree)
-        else:
-            ValueError('model invalid')
-    elif args.model in ["AllGCN", "AllGAT", "AllSAGE", "AllDegFairGNN"]:
-        if args.no_add_edge or args.n_add_edge == 0 or args.link_predictor_num_layers == 0 or args.link_prediction_lr == 0:
-            model_dic['link_predictor'] = None
-        else:
+    # if args.model == "DegFairGNN":
+    #     if args.base == 1:
+    #         model_dic['main'] = DFair_GCN(args, in_feat, in_class, data.max_degree)
+    #     elif args.base == 2:
+    #         model_dic['main'] = DFair_GAT(args, in_feat, in_class, data.max_degree)
+    #     elif args.base == 3:
+    #         model_dic['main'] = DFair_Sage(args, in_feat, in_class, data.max_degree)
+    #     else:
+    #         ValueError('model invalid')
+    if args.model in ["AllGCN", "AllGAT", "AllSAGE", "DegreeFairGNN"]:
+        if args.edge_adding_4_low and args.n_add_edge > 0 and args.link_predictor_num_layers > 0 and args.link_prediction_lr > 0:
             link_predictor_base = MLP(
                 in_channels = in_feat,
                 hidden_channels = args.link_predictor_hidden_channels,
@@ -88,9 +86,10 @@ def create_model(args, data):
                 base_model = link_predictor_base,
                 similarity_based = True,
             )
-        if args.n_add_node == 0 or args.node_generator_num_layers == 0:
-            node_generator = None
         else:
+            model_dic['link_predictor'] = None
+
+        if args.node_adding_4_low and args.n_add_node > 0 and args.node_generator_num_layers > 0:
             node_generator = GCN(
                 in_channels = args.minor_classifier_in_channels,
                 hidden_channels = args.node_generator_hidden_channels,
@@ -98,9 +97,10 @@ def create_model(args, data):
                 out_channels = args.minor_classifier_in_channels,
                 dropout = args.node_generator_dropout,
             )
-        if args.low_degree_updater_num_layers == 0 or args.no_low_degree_updater:
-            low_degree_updater = None
         else:
+            node_generator = None
+
+        if args.low_degree_additional_layer and args.low_degree_updater_num_layers > 0:
             low_degree_updater = GCN(
                 in_channels = args.minor_classifier_in_channels,
                 hidden_channels = args.low_degree_updater_hidden_channels,
@@ -108,6 +108,9 @@ def create_model(args, data):
                 out_channels = args.minor_classifier_in_channels,
                 dropout = args.low_degree_updater_dropout,
             )
+        else:
+            low_degree_updater = None
+
         kwargs_basic_gnn = {
             'in_channels': args.minor_classifier_in_channels,
             'hidden_channels': args.minor_classifier_hidden_channels,
@@ -127,11 +130,11 @@ def create_model(args, data):
             'omega': args.omega,
             'k': args.k,
             'max_degree': data.max_degree,
-            'no_structural_contrast': args.no_structural_contrast_degfair,
-            'no_modulation': args.no_modulation,
-            'random_miss': args.random_miss,
-            'no_miss': args.no_miss,
-            'no_localization': args.no_localization,
+            'structural_contrast': args.structural_contrast_on_degfair,
+            'modulation': args.degree_injection,
+            'random_miss': False,
+            'miss': args.missing_info,
+            'localization': args.missing_info,
         }
         if args.model == "AllGCN":
             minor_classifier = GCNWithIntermediateOutput(**kwargs_basic_gnn)
@@ -139,7 +142,7 @@ def create_model(args, data):
             minor_classifier = GATWithIntermediateOutput(**kwargs_basic_gnn)
         elif args.model == "AllSAGE":
             minor_classifier = GraphSAGEWithIntermediateOutput(**kwargs_basic_gnn)
-        elif args.model == "AllDegFairGNN":
+        elif args.model == "DegreeFairGNN":
             if args.base == 1:
                 minor_classifier = DFair_GCN(**kwargs_degfair_gnn)
             elif args.base == 2:
@@ -163,17 +166,17 @@ def create_model(args, data):
             node_generator = node_generator,
             low_degree_updater = low_degree_updater,
             n_add_node = args.n_add_node,
-            is_input_layer_discriminator_enabled = not args.no_discriminator,
-            is_input_layer_contrastive_enabled = not args.no_contrastive0,
+            is_input_layer_discriminator_enabled = args.degree_disc,
+            is_input_layer_contrastive_enabled = False,
         )
         kwargs = {
             'in_channels': args.minor_classifier_in_channels,
             'hidden_channels': args.discriminator_hidden_channels,
             'num_layers': args.discriminator_num_layers,
-            'out_channels': 3,  # low
+            'out_channels': 3,  # low, high or middle
             'dropout': args.discriminator_dropout,
         }
-        if not args.no_discriminator:
+        if args.degree_disc:
             if args.discriminator == 'MLP':
                 model_dic['discriminator'] = MLP(**kwargs)
             elif args.discriminator == 'GCN':
@@ -181,12 +184,12 @@ def create_model(args, data):
         else:
             model_dic['discriminator'] = None
 
-        if not args.no_discriminator_tailgnn and not args.no_forged_tail_node:
+        if args.augmented_low_degree_disc and args.edge_removing:
             model_dic['discriminator_tailgnn'] = DiscriminatorTailGNN(in_class)
         else:
             model_dic['discriminator_tailgnn'] = None
-    elif args.model == "DegreeDiscriminator":
-        model_dic['main'] = MLP(in_feat, args.dim, args.dim2, 3, args.dropout)
+    # elif args.model == "DegreeDiscriminator":
+    #     model_dic['main'] = MLP(in_feat, args.dim, args.dim2, 3, args.dropout)
     elif args.model == "RandomDegreeDiscriminator":
         model_dic['main'] = RandomDegreeDiscriminator()
     elif args.model == "MLP":
@@ -208,7 +211,7 @@ def create_model(args, data):
 def create_controller(model, args):
     if args.model in ["DegFairGNN"]:
         controller = DegFairGNNController(model, args.loss, args.lr, args.decay, args.w_f, args.w_b)
-    elif args.model in ["AllGCN", "AllGAT", "AllSAGE", "AllDegFairGNN"]:
+    elif args.model in ["AllGCN", "AllGAT", "AllSAGE", "DegreeFairGNN"]:
         controller = AllGNNController(
             link_predictor = model['link_predictor'],
             discriminator = model['discriminator'],
@@ -233,19 +236,19 @@ def create_controller(model, args):
             w_regularization_loss = args.w_regularization_loss,
             n_add_edge = args.n_add_edge,
             n_add_node = args.n_add_node,
-            is_ldu_enabled = (args.low_degree_updater_num_layers > 0),
-            no_scale_and_shift = args.no_scale_and_shift,
-            no_forged_tail_node = args.no_forged_tail_node,
-            no_sp_loss = args.no_sp_loss,
-            no_b_loss = args.no_b_loss,
-            no_missing_information_constraint = args.no_missing_information_constraint,
-            no_add_edge = args.no_add_edge,
-            no_add_node = args.no_add_node,
-            no_discriminator = args.no_discriminator,
-            no_contrastive0 = args.no_contrastive0,
-            no_contrastive1 = args.no_contrastive1,
-            no_regularization = args.no_regularization,
-            no_low_degree_finetune = args.no_low_degree_finetune,
+            low_degree_additional_layer = args.low_degree_additional_layer and (args.low_degree_updater_num_layers > 0),
+            scale_and_shift = args.structural_contrast_on_degfair or args.degree_injection,
+            forged_tail_node = args.edge_removing,
+            sp_loss = args.mean_cl,
+            b_loss = args.structural_contrast_on_degfair or args.degree_injection,
+            missing_information_constraint = args.missing_info,
+            add_edge = args.edge_adding_4_low,
+            add_node = args.node_adding_4_low,
+            degree_discriminator = args.degree_disc,
+            contrastive0 = False,
+            contrastive1 = args.pairwise_degree_cl,
+            regularization = False,
+            low_degree_finetune = args.low_degree_finetune,
         )
     elif args.model in ['Random']:
         controller = RandomModelController(model)

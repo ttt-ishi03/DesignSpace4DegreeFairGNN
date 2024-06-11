@@ -63,11 +63,11 @@ class DFair_GCN(nn.Module):
             omega,
             k,
             max_degree,
-            no_structural_contrast=False,
-            no_modulation=False,
+            structural_contrast=False,
+            modulation=False,
             random_miss=False,
-            no_miss=False,
-            no_localization=False,
+            miss=False,
+            localization=False,
         ):
         super(DFair_GCN, self).__init__()
         self.dropout = dropout
@@ -80,11 +80,11 @@ class DFair_GCN(nn.Module):
             omega,
             k,
             max_degree,
-            no_structural_contrast=no_structural_contrast,
-            no_modulation=no_modulation,
+            structural_contrast=structural_contrast,
+            modulation=modulation,
             random_miss=random_miss,
-            no_miss=no_miss,
-            no_localization=no_localization,
+            miss=miss,
+            localization=localization,
         )
         self.debias2 = Debias_v4(
             hidden_channels,
@@ -95,15 +95,15 @@ class DFair_GCN(nn.Module):
             omega,
             k,
             max_degree,
-            no_structural_contrast=no_structural_contrast,
-            no_modulation=no_modulation,
+            structural_contrast=structural_contrast,
+            modulation=modulation,
             random_miss=random_miss,
-            no_miss=no_miss,
-            no_localization=no_localization,
+            miss=miss,
+            localization=localization,
         )
         self.fc = nn.Linear(hidden_channels, out_channels)
-        self.no_structural_contrast = no_structural_contrast
-        self.no_modulation = no_modulation
+        self.structural_contrast = structural_contrast
+        self.modulation = modulation
 
     def set_hook(self):
         if hasattr(self.debias1, 'set_hook'):
@@ -152,11 +152,11 @@ class DFair_GAT(nn.Module):
             k,
             max_degree,
             nheads=3,
-            no_structural_contrast=False,
-            no_modulation=False,
+            structural_contrast=False,
+            modulation=False,
             random_miss=False,
-            no_miss=False,
-            no_localization=False,
+            miss=False,
+            localization=False,
         ):
         super(DFair_GAT, self).__init__()
         self.dropout = dropout
@@ -171,11 +171,11 @@ class DFair_GAT(nn.Module):
                 omega,
                 k,
                 max_degree,
-                no_structural_contrast=no_structural_contrast,
-                no_modulation=no_modulation,
+                structural_contrast=structural_contrast,
+                modulation=modulation,
                 random_miss=random_miss,
-                no_miss=no_miss,
-                no_localization=no_localization,
+                miss=miss,
+                localization=localization,
             ) for _ in range(nheads)
         ]
         for i, attention in enumerate(self.attentions):
@@ -190,11 +190,11 @@ class DFair_GAT(nn.Module):
             omega,
             k,
             max_degree,
-            no_structural_contrast=no_structural_contrast,
-            no_modulation=no_modulation,
+            structural_contrast=structural_contrast,
+            modulation=modulation,
             random_miss=random_miss,
-            no_miss=no_miss,
-            no_localization=no_localization,
+            miss=miss,
+            localization=localization,
         )
 
 
@@ -251,11 +251,11 @@ class DFair_Sage(nn.Module):
             omega,
             k,
             max_degree,
-            no_structural_contrast=False,
-            no_modulation=False,
+            structural_contrast=False,
+            modulation=False,
             random_miss=False,
-            no_miss=False,
-            no_localization=False,
+            miss=False,
+            localization=False,
         ):
         super(DFair_Sage, self).__init__()
         if isinstance(hidden_channels, int):
@@ -272,11 +272,11 @@ class DFair_Sage(nn.Module):
             omega,
             k,
             max_degree,
-            no_structural_contrast=no_structural_contrast,
-            no_modulation=no_modulation,
+            structural_contrast=structural_contrast,
+            modulation=modulation,
             random_miss=random_miss,
-            no_miss=no_miss,
-            no_localization=no_localization,
+            miss=miss,
+            localization=localization,
         )
         self.debias2 = Debias_v4(
             nhid1,
@@ -287,11 +287,11 @@ class DFair_Sage(nn.Module):
             omega,
             k,
             max_degree,
-            no_structural_contrast=no_structural_contrast,
-            no_modulation=no_modulation,
+            structural_contrast=structural_contrast,
+            modulation=modulation,
             random_miss=random_miss,
-            no_miss=no_miss,
-            no_localization=no_localization,
+            miss=miss,
+            localization=localization,
         )
         self.fc = nn.Linear(nhid2, out_channels)
 

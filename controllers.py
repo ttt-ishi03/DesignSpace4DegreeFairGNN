@@ -152,7 +152,6 @@ def _get_link(adj, n_target_edge):
     n_node = adj.shape[0]
     n_edge = adj.indices().shape[1]
 
-    # TODO neg_linkとpos_linkを正しくピックアップできているか確認
     random_indices = torch.randperm(n_edge)[:n_target_edge]
     pos_link = adj.indices()[:, random_indices]
     neg_link = torch.randint(0, n_node, [n_target_edge, 2]).cuda()
@@ -204,19 +203,19 @@ class AllGNNController(object):
             low_degree_finetune_loss: Callable = utils.low_degree_specific_loss,
             task_loss: Callable = nn.CrossEntropyLoss(),
             writer: SummaryWriter = None,
-            is_ldu_enabled: bool = True,
-            no_scale_and_shift: bool = False,
-            no_forged_tail_node: bool = False,
-            no_sp_loss: bool = False,
-            no_b_loss: bool = False,
-            no_missing_information_constraint: bool = False,
-            no_add_edge: bool = False,
-            no_add_node: bool = False,
-            no_discriminator: bool = False,
-            no_contrastive0: bool = False,
-            no_contrastive1: bool = False,
-            no_regularization: bool = False,
-            no_low_degree_finetune: bool = False,
+            low_degree_additional_layer: bool = True,
+            scale_and_shift: bool = False,
+            forged_tail_node: bool = False,
+            sp_loss: bool = False,
+            b_loss: bool = False,
+            missing_information_constraint: bool = False,
+            add_edge: bool = False,
+            add_node: bool = False,
+            degree_discriminator: bool = False,
+            contrastive0: bool = False,
+            contrastive1: bool = False,
+            regularization: bool = False,
+            low_degree_finetune: bool = False,
         ):
         self.link_predictor = link_predictor
         self.discriminator = discriminator
@@ -252,18 +251,18 @@ class AllGNNController(object):
         self.low_degree_finetune_loss = low_degree_finetune_loss
         self.task_loss = task_loss
 
-        self.no_scale_and_shift = no_scale_and_shift
-        self.no_forged_tail_node = no_forged_tail_node
-        self.no_sp_loss = no_sp_loss
-        self.no_b_loss = no_b_loss
-        self.no_missing_information_constraint = no_missing_information_constraint
-        self.no_add_edge = no_add_edge
-        self.no_add_node = no_add_node
-        self.no_discriminator = no_discriminator
-        self.no_contrastive0 = no_contrastive0
-        self.no_contrastive1 = no_contrastive1
-        self.no_regularization = no_regularization
-        self.no_low_degree_finetune = no_low_degree_finetune
+        self.scale_and_shift = scale_and_shift
+        self.forged_tail_node = forged_tail_node
+        self.sp_loss = sp_loss
+        self.b_loss = b_loss
+        self.missing_information_constraint = missing_information_constraint
+        self.add_edge = add_edge
+        self.add_node = add_node
+        self.degree_disc = degree_discriminator
+        self.contrastive0 = contrastive0
+        self.contrastive1 = contrastive1
+        self.regularization = regularization
+        self.low_degree_finetune = low_degree_finetune
 
         self.contrastive_loss = [None, None]
         if contrastive_loss is None:
@@ -288,20 +287,21 @@ class AllGNNController(object):
         else:
             self.writer = writer
 
-        self.is_edge_addition_enabled = (n_add_edge > 0 and link_predictor is not None and link_prediction_lr != 0 and not self.no_add_edge)
-        self.is_node_addition_enabled = (n_add_node > 0 and node_generation_loss is not None and w_node_generator_loss != 0 and not self.no_add_node)
+        self.is_edge_addition_enabled = (n_add_edge > 0 and link_predictor is not None and link_prediction_lr != 0 and self.add_edge)
+        self.is_node_addition_enabled = (n_add_node > 0 and node_generation_loss is not None and w_node_generator_loss != 0 and self.add_node)
         self.is_contrastive_learning_enabled = [
-            (self.w_contrastive_loss[0] != 0) and not self.no_contrastive0,
-            (self.w_contrastive_loss[1] != 0) and not self.no_contrastive1,
+            (self.w_contrastive_loss[0] != 0) and self.contrastive0,
+            (self.w_contrastive_loss[1] != 0) and self.contrastive1,
         ]
-        self.is_regularization_enabled = (self.w_regularization_loss != 0 and is_ldu_enabled) and not self.no_regularization
-        self.is_adversarial_learning_enabled = (self.w_discriminator_loss != 0 and self.discriminator_lr != 0 and self.discriminator is not None) and not self.no_discriminator
-        self.is_low_degree_finetuning_enabled = (self.low_degree_finetune_lr > 0) and not self.no_low_degree_finetune
-        self.is_sp_loss_enabled = (self.w_sp_loss != 0) and not self.no_sp_loss
-        self.is_b_loss_enabled = (self.w_b_loss != 0) and not self.no_b_loss
-        self.is_film_loss_enabled = (self.w_film_loss != 0) and not self.no_scale_and_shift
-        self.is_missing_information_constraint_enabled = (self.w_missing_information_constraint != 0) and not self.no_missing_information_constraint
-        self.is_discriminator_tailgnn_enabled = (self.discriminator_tailgnn is not None and self.discriminator_tailgnn_loss is not None and self.w_discriminator_tailgnn_loss != 0) and not self.no_forged_tail_node
+        self.is_ldu_enabled = low_degree_additional_layer
+        self.is_regularization_enabled = (self.w_regularization_loss != 0 and low_degree_additional_layer) and not self.regularization
+        self.is_adversarial_learning_enabled = (self.w_discriminator_loss != 0 and self.discriminator_lr != 0 and self.discriminator is not None) and self.degree_disc
+        self.is_low_degree_finetuning_enabled = (self.low_degree_finetune_lr > 0) and self.low_degree_finetune
+        self.is_sp_loss_enabled = (self.w_sp_loss != 0) and self.sp_loss
+        self.is_b_loss_enabled = (self.w_b_loss != 0) and self.b_loss
+        self.is_film_loss_enabled = (self.w_film_loss != 0) and self.scale_and_shift
+        self.is_missing_information_constraint_enabled = (self.w_missing_information_constraint != 0) and self.missing_information_constraint
+        self.is_discriminator_tailgnn_enabled = (self.discriminator_tailgnn is not None and self.discriminator_tailgnn_loss is not None and self.w_discriminator_tailgnn_loss != 0) and self.forged_tail_node
 
     def load_state_dict(self, link_predictor, classifier, low_degree_specific_classifier):
         if self.link_predictor is not None:
@@ -327,16 +327,12 @@ class AllGNNController(object):
         print('Link Prediction Training ...')
         optimizer = optim.Adam(self.link_predictor.parameters(),
                     lr=self.link_prediction_lr, weight_decay=self.link_prediction_decay)
-        # mask = data.idx_train
 
-        # n_node = data.feat.shape[0]
         n_edge = data.adj.indices().shape[1]
         n_target_edge = int(n_edge*ratio)
 
         best_score = -float('inf')
         best_epoch = 0
-
-        # TODO: mask data.adj
 
         pbar = tqdm.tqdm(range(n_epoch))
 
@@ -360,14 +356,11 @@ class AllGNNController(object):
             link_prediction_loss.backward()
             optimizer.step()
 
-            # TODO link_prediction_lossが正しく計算されているか確認
-            # TODO validate関数の実装
             score = self.link_prediction_validate(data, n_target_edge, i+1)
             self.writer.add_scalar('link_prediction_validation_score', score, i)
             if score > best_score:
                 best_score = score
                 best_epoch = i
-                # TODO モデルの保存機能の追加
                 self.best_link_predictor_state_dict = copy.deepcopy(self.link_predictor.state_dict())
                 self.writer.add_scalar('link_prediction_best_validation_score', best_score, i)
             pbar.set_postfix(
@@ -418,7 +411,7 @@ class AllGNNController(object):
             output, features = self.classifier(data.feat, data.adj_, **kwargs)
 
             discriminator_tailgnn_loss = 0
-            if not self.no_forged_tail_node:
+            if self.forged_tail_node:
                 kwargs['head'] = False
                 self.classifier.set_degree(data.low_degree_group, data.tail_adj_degree)
                 output_t, _ = self.classifier(data.feat, data.tail_adj, **kwargs)
@@ -438,9 +431,8 @@ class AllGNNController(object):
                 self.is_missing_information_constraint_enabled = False
 
             # Task Loss
-            # TODO: 関数にする
             task_loss = self.task_loss(output[mask], data.labels[mask])
-            if not self.no_forged_tail_node:
+            if self.forged_tail_node:
                 task_loss += self.task_loss(output_t[mask], data.labels[mask])
                 task_loss = task_loss / 2
             postfix['Lt'] = task_loss.item()
@@ -554,7 +546,6 @@ class AllGNNController(object):
             if best_score < score:
                 best_score = score
                 best_epoch = i
-                # TODO モデルの保存機能の追加
                 self.best_classifier_state_dict = copy.deepcopy(self.classifier.state_dict())
                 postfix['best_score'] = best_score
                 postfix['best_ep'] = best_epoch
@@ -567,7 +558,7 @@ class AllGNNController(object):
 
         return best_score
 
-    def low_degree_finetune(
+    def finetune(
             self,
             data,
             n_epoch: int = 500,
@@ -608,14 +599,12 @@ class AllGNNController(object):
             low_degree_finetune_loss.backward()
             optimizer.step()
 
-            # TODO validate関数の実装
             score = self.classification_validate(data, i)
             postfix['val_score'] = score
             self.writer.add_scalar('low_degree_finetune_validation_score', score, i)
             if best_score < score:
                 best_score = score
                 best_epoch = i
-                # TODO モデルの保存機能の追加
                 self.best_low_degree_specific_classifier_state_dict = copy.deepcopy(self.low_degree_specific_classifier.state_dict())
                 postfix['best_val_score'] = best_score
                 postfix['best_epoch'] = best_epoch
@@ -664,17 +653,16 @@ class AllGNNController(object):
                 self.best_link_predictor.load_state_dict(self.best_link_predictor_state_dict)
                 self.best_link_predictor.eval()
                 with torch.no_grad():
-                    if self.is_edge_addition_enabled:
-                        score = self.best_link_predictor(data.feat, data.adj, data.low_degree_group, torch.arange(data.feat.shape[0]), all_pair=True)
-                        data.adj_ = utils.add_edge(data.adj, data.low_degree_group, score, self.n_add_edge)
-                        data.edge_ = data.adj_.indices()
+                    score = self.best_link_predictor(data.feat, data.adj, data.low_degree_group, torch.arange(data.feat.shape[0]), all_pair=True)
+                    data.adj_ = utils.add_edge(data.adj, data.low_degree_group, score, self.n_add_edge)
+                    data.edge_ = data.adj_.indices()
 
         data.tail_adj, data.tail_adj_degree = create_tail_adj(data.adj_, data.degree, data.idx_train, 5, self.classifier.rng)
 
         self.classification_train(data, n_epoch_classification, early_stopping_patience_classification)
 
         if self.is_low_degree_finetuning_enabled:
-            self.low_degree_finetune(data, n_epoch_low_degree_finetune, early_stopping_patience_low_degree_finetune)
+            self.finetune(data, n_epoch_low_degree_finetune, early_stopping_patience_low_degree_finetune)
 
     def link_prediction_validate(self, data, n_target_edge, epoch):
         self.link_predictor.eval()

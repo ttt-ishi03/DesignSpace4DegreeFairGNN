@@ -60,7 +60,6 @@ class AllGNN(nn.Module):
         x = self.fc_in(x)
         # Node Generator
         if self.is_node_addition_enabled:
-            # TODO: adjをcsr形式で処理する
             dummy_adj, cut_nodes = create_dummy_adj(adj, self.degree, self.rng)
             generated_nodes = self.node_generator(x, dummy_adj)
             low_degree_idx = torch.where(cut_nodes==-1)[0]

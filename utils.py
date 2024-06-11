@@ -747,7 +747,6 @@ def add_edge(adj, srcs, score, n_add_edge: int):
     pbar.set_description("adding edge")
     srcs = []
     drts = []
-    # TODO: 高速化（ソートして探索してやれば速くなるはず）
     for i, idc in enumerate(pbar):
         add_cnt = 0
         neighbors = adj[i].coalesce().indices()

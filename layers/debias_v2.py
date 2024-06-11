@@ -397,11 +397,11 @@ class Debias_v4(nn.Module):
             ver=2,
             dropout=0.5,
             nheads=1,
-            no_structural_contrast=False,
-            no_modulation=False,
+            structural_contrast=True,
+            modulation=True,
             random_miss=False,
-            no_miss=False,
-            no_localization=False,
+            miss=True,
+            localization=True,
         ):
         super(Debias_v4, self).__init__()
 
@@ -414,18 +414,18 @@ class Debias_v4(nn.Module):
         self.k = k
         self.dropout = dropout
         self.nheads = nheads
-        self.no_structural_contrast = no_structural_contrast
-        self.no_modulation = no_modulation
+        self.structural_contrast = structural_contrast
+        self.modulation = modulation
         self.random_miss = random_miss
-        self.no_miss = no_miss
-        self.no_localization = no_localization
+        self.miss = miss
+        self.localization = localization
         #self.w = args.w
         #self.sparse = args.sparse[]
 
         if ver == 1:
             self.r = Relation(in_channels, out_channels)
         else:
-            self.r = Relationv2(in_channels, out_channels, self.no_localization)
+            self.r = Relationv2(in_channels, out_channels, not self.localization)
         self.g = Generator(in_channels)
 
         # self.weight = nn.Linear(in_channels, out_channels)
@@ -540,13 +540,13 @@ class Debias_v4(nn.Module):
             output = self.conv(x, adj)
             h = self.lin_feat  # self.lin_feat is the intermediate feature of conv layer. It is stored in hook function
         else:
-            if head or self.no_miss:
+            if head or not self.miss:
                 output, h = self.conv(x, edge)
             else:
                 output, h = self.conv(x, edge, mi=h_s)
 
         m_dv = torch.squeeze(self.PE[degree])
-        if not self.no_structural_contrast and self.no_modulation:
+        if self.structural_contrast and not self.modulation:
             # if the model have structural contrast but no modulation, the model have different weights in high and low degree nodes
             # but degree encoding is not used
             m_dv = torch.zeros_like(m_dv)
@@ -584,16 +584,16 @@ class Debias_v4(nn.Module):
         L_film = torch.sum(torch.norm(gamma[idx], dim=1)) + torch.sum(torch.norm(beta[idx], dim=1))
         L_film /= idx.shape[0]
 
-        if not self.no_structural_contrast and not self.no_modulation:
+        if self.structural_contrast and self.modulation:
             bias = self.omega * (R * b_add - (1-R) * b_rev)
-        elif self.no_structural_contrast and not self.no_modulation:
+        elif not self.structural_contrast and self.modulation:
             bias = self.omega * (b_add - b_rev)
-        elif not self.no_structural_contrast and self.no_modulation:
+        elif self.structural_contrast and not self.modulation:
             bias = self.omega * (R * b_add - (1-R) * b_rev)
-        elif self.no_structural_contrast and self.no_modulation:
+        elif not self.structural_contrast and not self.modulation:
             bias = 0
 
-        if not head and not self.no_miss:
+        if not head and self.miss:
             if self.base == 1:
                 h_s = self.conv.lin(h_s) / (degree + 1)
             elif self.base == 3:
