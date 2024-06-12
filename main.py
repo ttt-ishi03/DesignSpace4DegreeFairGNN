@@ -86,7 +86,7 @@ def main():
     parser.add_argument('--w_regularization_loss', type=float, default=1e-4, help='weight for regularization loss')
 
     # model arguments
-    parser.add_argument('--model', type=str, default='DegFairGNN', help='model name (DegFarGNN, GCN, GAT, GraphSAGE, GloGNN)')
+    parser.add_argument('--model', type=str, default='DegreeFairGNN', help='model name')
     parser.add_argument('--base', type=int, default=1, help='1: GCN, 2: GAT, 3: Sage')
     parser.add_argument('--discriminator', type=str, default='MLP', help='discriminator(MLP/GCN)')
     parser.add_argument('--dim_d', type=int, default=32, help='degree mat dimension')
