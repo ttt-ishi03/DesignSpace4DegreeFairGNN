@@ -16,7 +16,7 @@ $ pip install -r requirement.txt
 The following command is the minimum setup required to run the training with GCN on the EMNLP dataset:
 
 ```
-$ python main.py --model "DegreeFairGNN" --base 1 --dataset "emnlp" --gpu "0" --dir_name hogehoge
+$ python main.py --base 1 --dataset "emnlp" --gpu "0" --dir_name hogehoge
 ```
 
 Base 1, 2, and 3 correspond to GCN, GAT, and GraphSAGE, respectively. 
@@ -46,3 +46,6 @@ Additionally, to run hyperparameter tuning, set the argument --optuna and specif
 ```
 $ python main.py --model "DegreeFairGNN" --base 1 --dataset "emnlp" --gpu "0" --dir_name hogehoge --optuna --optuna_n_trials 100
 ```
+
+## LICENSE
+CC BY 4.0
